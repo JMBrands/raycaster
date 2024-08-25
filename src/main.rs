@@ -1,10 +1,5 @@
 mod shapes;
 
-use std::{
-    any::{self, Any},
-    borrow::Borrow,
-};
-
 use raylib::prelude::*;
 
 const WIDTH: i32 = 1024;
@@ -21,7 +16,7 @@ fn main() {
     root.push(shapes::Cube::new(
         10.0,
         0.0,
-        0.0,
+        -0.5,
         1.0,
         1.0,
         1.0,
@@ -33,13 +28,28 @@ fn main() {
         },
     ));
 
+    root.push(shapes::Cube::new(
+        50.0,
+        0.0,
+        -5.0,
+        10.0,
+        10.0,
+        10.0,
+        Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 0,
+        },
+    ));
+
     let camera = shapes::Camera::new(
         Vector3 {
             x: 0.0,
             y: 0.0,
             z: 0.0,
         },
-        90,
+        360,
         shapes::Angle3D {
             roll: 0.0,
             yaw: 0.0,
@@ -52,7 +62,7 @@ fn main() {
     );
 
     while !rl.window_should_close() {
-        let mut d = rl.begin_drawing(&thread);
+        let d = rl.begin_drawing(&thread);
         camera.draw(d, &root);
     }
 }

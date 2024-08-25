@@ -1,4 +1,5 @@
-use std::{borrow::Borrow, f32::INFINITY};
+use ::core::f32;
+use std::f32::INFINITY;
 
 use raylib::prelude::*;
 
@@ -7,6 +8,7 @@ pub enum Shape {
     Camera(Camera),
 }
 
+#[derive(Clone, Copy)]
 pub struct Camera {
     pos: Vector3,
     fov: i32,
@@ -40,15 +42,16 @@ impl Camera {
                             + (((y as f32) - (self.dimensions.y / 2.0)) / self.dimensions.y
                                 * (self.fov as f32)),
                     },
-                    255.0,
+                    127.0,
+                    root,
                 );
                 d.draw_pixel(
                     x,
                     y,
                     Color {
-                        r: distance as u8,
-                        g: distance as u8,
-                        b: distance as u8,
+                        r: (distance*2.0 % 255.0) as u8,
+                        g: (distance*2.0 % 255.0) as u8,
+                        b: (distance*2.0 % 255.0) as u8,
                         a: 255,
                     },
                 );
@@ -59,6 +62,7 @@ impl Camera {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Angle3D {
     pub roll: f32,
     pub yaw: f32,
@@ -75,60 +79,71 @@ pub fn distance(vec1: Vector3, vec2: Vector3) -> f32 {
     f32::sqrt(distance_squared(vec1, vec2))
 }
 
-pub fn fire_ray(start: Vector3, angle: Angle3D, limit: f32, root: Vec<Shape>) -> f32 {
-    let mut smallest = &root[0];
-    let mut smallest_dist = distance_squared(
-        match smallest {
-            Shape::Cube(cube) => cube.position,
-            Shape::Camera(_) => Vector3 {
-                x: INFINITY,
-                y: INFINITY,
-                z: INFINITY,
-            },
-        },
-        start,
-    );
-    for shape in root {
-        let dist = distance_squared(
-            match shape {
-                Shape::Cube(cube) => cube.position,
+pub fn fire_ray(start: Vector3, angle: Angle3D, limit: f32, root: &Vec<Shape>) -> f32 {
+    let mut total = 0.0;
+    let mut position = start;
+    let mut last_dist = 1.0;
+    while last_dist > 0.01 {
+        let mut smallest = &root[0];
+        let mut smallest_dist = distance_squared(
+            match smallest {
+                Shape::Cube(cube) => cube.closest_point_on_cube(position),
                 Shape::Camera(_) => Vector3 {
                     x: INFINITY,
                     y: INFINITY,
                     z: INFINITY,
                 },
             },
-            start,
+            position,
         );
+        for shape in root {
+            let dist = distance_squared(
+                match shape {
+                    Shape::Cube(ref cube) => cube.closest_point_on_cube(position),
+                    Shape::Camera(_) => Vector3 {
+                        x: INFINITY,
+                        y: INFINITY,
+                        z: INFINITY,
+                    },
+                },
+                position,
+            );
 
-        if dist >= 0.0 && dist < smallest_dist {
-            match shape {
-                Shape::Cube(cube) => {
-                    smallest = &Cube::new(
-                        cube.position.x,
-                        cube.position.y,
-                        cube.position.z,
-                        cube.dimensions.x,
-                        cube.dimensions.y,
-                        cube.dimensions.z,
-                        cube.color,
-                    );
-                }
-                Shape::Camera(camera) => {
-                    smallest = &Shape::Camera(Camera::new(
-                        camera.pos,
-                        camera.fov,
-                        camera.angle,
-                        camera.dimensions,
-                    ));
-                }
-            };
-            smallest_dist = dist;
+            if dist >= 0.0 && dist < smallest_dist {
+                match shape {
+                    Shape::Cube(ref cube) => {
+                        smallest = &Shape::Cube(*cube);
+                    }
+                    Shape::Camera(camera) => {
+                        smallest = &Shape::Camera(*camera);
+                    }
+                };
+                smallest_dist = dist;
+            }
         }
+        smallest_dist = f32::sqrt(smallest_dist);
+        total += smallest_dist;
+        // Vector((cos(yaw) cos(pitch), cos(yaw) sin(pitch), sin(yaw)))
+        position = Vector3 {
+            x: position.x
+                + smallest_dist
+                    * f32::cos(-angle.yaw / 360.0 * 2.0 * f32::consts::PI)
+                    * f32::cos(-angle.pitch / 360.0 * 2.0 * f32::consts::PI),
+            y: position.x
+                + smallest_dist
+                    * f32::cos(-angle.yaw / 360.0 * 2.0 * f32::consts::PI)
+                    * f32::sin(-angle.pitch / 360.0 * 2.0 * f32::consts::PI),
+            z: position.z + smallest_dist * f32::sin(-angle.yaw / 360.0 * 2.0 * f32::consts::PI),
+        };
+        if total >= limit {
+            return limit;
+        }
+        last_dist = smallest_dist;
     }
-    limit - smallest_dist
+    total
 }
 
+#[derive(Clone, Copy)]
 pub struct Cube {
     position: Vector3,
     dimensions: Vector3,
@@ -146,5 +161,36 @@ impl Cube {
             },
             color: color,
         })
+    }
+
+    pub fn closest_point_on_cube(&self, to: Vector3) -> Vector3 {
+        let mut final_x = 0.0;
+        let mut final_y = 0.0;
+        let mut final_z = 0.0;
+        if to.x >= self.position.x && to.x <= self.position.x + self.dimensions.x {
+            final_x = to.x;
+        } else if to.x < self.position.x {
+            final_x = self.position.x;
+        } else {
+            final_x = self.position.x + self.dimensions.x;
+        }
+
+        if to.y >= self.position.y && to.y <= self.position.y + self.dimensions.y {
+            final_y = to.y;
+        } else if to.y < self.position.y {
+            final_y = self.position.y;
+        } else {
+            final_y = self.position.y + self.dimensions.y;
+        }
+
+        if to.z >= self.position.z && to.z <= self.position.z + self.dimensions.z {
+            final_z = to.z;
+        } else if to.z < self.position.z {
+            final_z = self.position.z;
+        } else {
+            final_z = self.position.z + self.dimensions.z;
+        }
+
+        Vector3 { x: final_x, y: final_y, z: final_z }
     }
 }
