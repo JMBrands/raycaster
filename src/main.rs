@@ -1,6 +1,9 @@
 mod shapes;
 
-use std::{any::{self, Any}, borrow::Borrow};
+use std::{
+    any::{self, Any},
+    borrow::Borrow,
+};
 
 use raylib::prelude::*;
 

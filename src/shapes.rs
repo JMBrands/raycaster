@@ -1,3 +1,5 @@
+use std::{borrow::Borrow, f32::INFINITY};
+
 use raylib::prelude::*;
 
 pub enum Shape {
@@ -38,7 +40,7 @@ impl Camera {
                             + (((y as f32) - (self.dimensions.y / 2.0)) / self.dimensions.y
                                 * (self.fov as f32)),
                     },
-                    127,
+                    255.0,
                 );
                 d.draw_pixel(
                     x,
@@ -63,8 +65,68 @@ pub struct Angle3D {
     pub pitch: f32,
 }
 
-pub fn fire_ray(start: Vector3, angle: Angle3D, limit: i32) -> i32 {
-    limit
+pub fn distance_squared(vec1: Vector3, vec2: Vector3) -> f32 {
+    (vec1.x - vec2.x) * (vec1.x - vec2.x)
+        + (vec1.y - vec2.y) * (vec1.y - vec2.y)
+        + (vec1.z - vec2.z) * (vec1.z - vec2.z)
+}
+
+pub fn distance(vec1: Vector3, vec2: Vector3) -> f32 {
+    f32::sqrt(distance_squared(vec1, vec2))
+}
+
+pub fn fire_ray(start: Vector3, angle: Angle3D, limit: f32, root: Vec<Shape>) -> f32 {
+    let mut smallest = &root[0];
+    let mut smallest_dist = distance_squared(
+        match smallest {
+            Shape::Cube(cube) => cube.position,
+            Shape::Camera(_) => Vector3 {
+                x: INFINITY,
+                y: INFINITY,
+                z: INFINITY,
+            },
+        },
+        start,
+    );
+    for shape in root {
+        let dist = distance_squared(
+            match shape {
+                Shape::Cube(cube) => cube.position,
+                Shape::Camera(_) => Vector3 {
+                    x: INFINITY,
+                    y: INFINITY,
+                    z: INFINITY,
+                },
+            },
+            start,
+        );
+
+        if dist >= 0.0 && dist < smallest_dist {
+            match shape {
+                Shape::Cube(cube) => {
+                    smallest = &Cube::new(
+                        cube.position.x,
+                        cube.position.y,
+                        cube.position.z,
+                        cube.dimensions.x,
+                        cube.dimensions.y,
+                        cube.dimensions.z,
+                        cube.color,
+                    );
+                }
+                Shape::Camera(camera) => {
+                    smallest = &Shape::Camera(Camera::new(
+                        camera.pos,
+                        camera.fov,
+                        camera.angle,
+                        camera.dimensions,
+                    ));
+                }
+            };
+            smallest_dist = dist;
+        }
+    }
+    limit - smallest_dist
 }
 
 pub struct Cube {
