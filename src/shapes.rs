@@ -42,16 +42,16 @@ impl Camera {
                             + (((y as f32) - (self.dimensions.y / 2.0)) / self.dimensions.y
                                 * (self.fov as f32)),
                     },
-                    127.0,
+                    255.0,
                     root,
                 );
                 d.draw_pixel(
                     x,
                     y,
                     Color {
-                        r: (distance*2.0 % 255.0) as u8,
-                        g: (distance*2.0 % 255.0) as u8,
-                        b: (distance*2.0 % 255.0) as u8,
+                        r: 255 - (distance % 256.0) as u8,
+                        g: 255 - (distance % 256.0) as u8,
+                        b: 255 - (distance % 256.0) as u8,
                         a: 255,
                     },
                 );
@@ -59,6 +59,7 @@ impl Camera {
             }
             x += 1;
         }
+        println!("drew");
     }
 }
 
@@ -128,11 +129,11 @@ pub fn fire_ray(start: Vector3, angle: Angle3D, limit: f32, root: &Vec<Shape>) -
             x: position.x
                 + smallest_dist
                     * f32::cos(-angle.yaw / 360.0 * 2.0 * f32::consts::PI)
-                    * f32::cos(-angle.pitch / 360.0 * 2.0 * f32::consts::PI),
+                    * f32::cos(angle.pitch / 360.0 * 2.0 * f32::consts::PI),
             y: position.x
                 + smallest_dist
                     * f32::cos(-angle.yaw / 360.0 * 2.0 * f32::consts::PI)
-                    * f32::sin(-angle.pitch / 360.0 * 2.0 * f32::consts::PI),
+                    * f32::sin(angle.pitch / 360.0 * 2.0 * f32::consts::PI),
             z: position.z + smallest_dist * f32::sin(-angle.yaw / 360.0 * 2.0 * f32::consts::PI),
         };
         if total >= limit {
